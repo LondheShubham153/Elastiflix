@@ -7,8 +7,8 @@ repo before being written down — the numbers are real output.
 (4) Elasticsearch by hand · (5) Logstash · (6) Beats · (7) Kibana · (8) where it's used ·
 (9) misconceptions
 
-**Part 2 — this repo** (10) every file explained · (11) every action in order ·
-(12) changes to the app · (13) docs
+**Part 2 — this repo** (10) every file explained · (11) `start-local`, the official quickstart ·
+(12) every action in order · (13) changes to the app · (14) docs
 
 Start the stack first: `./elk/setup/02-start-stack.sh`
 
@@ -368,7 +368,73 @@ for 3–5 minutes on a cold start** — `metricbeat-*` at zero docs early is exp
 
 ---
 
-## 11. Every action, in order
+## 11. `start-local` — Elastic's official quickstart
+
+Elastic's docs point everyone at a one-liner, and you *will* meet it:
+
+```bash
+curl -fsSL https://elastic.co/start-local | sh
+```
+
+**This repo does not use it.** Worth knowing exactly what it is and why.
+
+### What it actually does
+
+| | |
+|---|---|
+| Starts | **Elasticsearch + Kibana only** (plus an optional EDOT collector) |
+| Logstash / Beats | **Neither.** Not included. |
+| Security | `xpack.security.enabled=true` — generates an `elastic` password and an API key into `.env` |
+| Heap | `-Xms2g -Xmx2g` |
+| Creates | `elastic-start-local/` containing `start.sh`, `stop.sh`, `uninstall.sh`, `.env` |
+| Licence | 30-day trial, then automatically drops to basic |
+| Ports | `9200` and `5601` — the same ones our stack uses |
+
+### Why we don't build on it
+
+It covers **one of the four components this video teaches**. Logstash, Filebeat and Metricbeat
+would still need a compose file of their own — so you'd be running two compose projects, bridging
+two networks, and (because security is on) hand-wiring the generated API key into three separate
+configs. More moving parts, on the one component that was never the hard bit.
+
+`elk/docker-compose.elk.yml` starts all five together, on one network, with no credentials.
+
+### When you *should* use it
+
+- You only need Elasticsearch + Kibana — no ingest pipeline
+- You want a realistic **security-enabled** cluster to practise API keys against
+- You want the officially-supported path rather than someone's compose file
+
+### Trying it
+
+It binds the same ports as our stack, so stop ours first. (`ES_LOCAL_DIR` renames its containers
+so you can keep several installs side by side, but the ports are written as `9200`/`5601`
+regardless — there's no port override, so the clash is unavoidable.)
+
+```bash
+./elk/setup/99-teardown.sh
+curl -fsSL https://elastic.co/start-local | sh
+
+cd elastic-start-local
+cat .env          # ES_LOCAL_PASSWORD and ES_LOCAL_API_KEY live here
+./stop.sh         # ./uninstall.sh to remove it entirely
+```
+
+With security on, requests need credentials — a useful contrast with our open cluster:
+
+```bash
+source elastic-start-local/.env
+curl -H "Authorization: ApiKey $ES_LOCAL_API_KEY" localhost:9200
+curl -u elastic:$ES_LOCAL_PASSWORD localhost:9200
+```
+
+> **Teaching note:** our stack disables security so nothing can break mid-lesson. That is a
+> *demo* choice, not a good one. `start-local` shows what the defaults should look like — worth
+> two minutes on camera so nobody ships `xpack.security.enabled=false` to production.
+
+---
+
+## 12. Every action, in order
 
 | # | Command | What actually happens |
 |---|---|---|
@@ -396,7 +462,7 @@ curl -s 'localhost:9200/_cat/indices?v'                # the whole picture
 
 ---
 
-## 12. Changes to the app itself
+## 13. Changes to the app itself
 
 Four upstream files touched.
 
@@ -431,7 +497,7 @@ Elasticsearch error became an unhandled rejection and the browser just hung.
 
 ---
 
-## 13. Docs
+## 14. Docs
 
 **Start here**
 - Get started: https://www.elastic.co/docs/get-started
