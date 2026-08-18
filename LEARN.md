@@ -177,7 +177,20 @@ output { elasticsearch { hosts => ["${ES_HOST}"] index => "elastiflix-movies" } 
 Filters worth knowing: `grok` (parse unstructured text), `json`, `mutate` (rename/convert/remove),
 `date` (parse into `@timestamp`), `drop`, `ruby` (escape hatch).
 
-**Why not just bulk-load?** Because the data you have is never quite the data your app needs.
+**Why not just use upstream's `index-data.py`?** Because on a free licence it *cannot run at all*.
+Its `config/schema.json` maps `plot_elser` and `plot_e5` as `semantic_text`, and `plot` has a
+`copy_to` into them. Indexing any movie with a plot therefore triggers inference, and inference
+is a paid feature:
+
+```
+security_exception: current license is non-compliant for [inference]
+```
+
+Verified against this stack — the bulk load dies part-way through. You need an ML node and a
+trial/platinum licence before that script indexes a single document with a plot. Logstash has no
+such dependency.
+
+**And even if it ran:** the data you have is never quite the data your app needs.
 Real example from this repo — the UI renders a `user_score` facet, but *zero* of the 6,959 source
 documents contain that field:
 
@@ -546,7 +559,7 @@ Elasticsearch error became an unhandled rejection and the browser just hung.
 
 | Bug | Fix |
 |---|---|
-| `pip-requirements.txt` pinned `elasticsearch==8.4.0` — predates the `inference.put`/`semantic_text` APIs the script calls, so the loader **could not run as published** | bumped to `9.1.0`, added the undeclared `tqdm` |
+| `pip-requirements.txt` pinned `elasticsearch==8.4.0` — predates the `inference.put`/`semantic_text` APIs the script calls | bumped to `9.1.0`, added the undeclared `tqdm`. Makes it *install*; see the licence note below for why it still won't run |
 | `index-data.py` defaulted to index `movies` while compose expected `elastiflix-movies` → `index_not_found` | default changed |
 | `parallel_bulk(chunk_size=10)` | raised to 500 |
 | compose pointed at a placeholder Elastic Cloud URL needing a hand-pasted API key | points at local ES, no credentials |

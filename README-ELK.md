@@ -126,7 +126,7 @@ Start the stack before you need it.
 
 | Bug | Fix |
 |---|---|
-| `pip-requirements.txt` pinned `elasticsearch==8.4.0`, far too old for the `inference.put` / `semantic_text` APIs the loader calls — it could not run as published | Bumped to `9.1.0`, added the undeclared `tqdm` |
+| `pip-requirements.txt` pinned `elasticsearch==8.4.0`, far too old for the `inference.put` / `semantic_text` APIs the loader calls | Bumped to `9.1.0`, added the undeclared `tqdm`. **This makes it install, not work** — see below |
 | `docker-compose.yml` set `ES_INDEX=elastiflix-movies` but `index-data.py` defaulted to `movies`, so following the README gave `index_not_found` | Default changed to `elastiflix-movies` |
 | `parallel_bulk(chunk_size=10)` — needlessly slow | Raised to 500 |
 | Compose pointed at a placeholder Elastic Cloud URL requiring a hand-pasted API key | Points at local Elasticsearch, no credentials needed |

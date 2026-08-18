@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     
     # Required arguments
-    parser.add_argument('--data_folder', dest='data_folder', required=False, default='elastiflix-movies')
+    parser.add_argument('--data_folder', dest='data_folder', required=False, default='movies')
     parser.add_argument('--config_folder', dest='config_folder', required=False, default='config')
     parser.add_argument('--es_api_key', dest='es_api_key', required=True)
     parser.add_argument('--es_host', dest='es_host', required=True)
