@@ -110,7 +110,11 @@ Logstash.
 - `metricbeat.yml` — Docker + Elasticsearch modules, shipping **direct to Elasticsearch**,
   because there's nothing to transform. Logstash is a choice, not a mandatory tax
 
-Metricbeat also loads its prebuilt dashboards into Kibana automatically.
+Metricbeat also loads its prebuilt dashboards into Kibana automatically — about 112 of them.
+
+**Be aware:** that load *blocks metric publishing* while it runs, 3–5 minutes on a first start.
+`metricbeat-*` sitting at zero documents for the first few minutes is expected, not a failure.
+Start the stack before you need it.
 
 ### 4. Upstream bugs fixed
 
