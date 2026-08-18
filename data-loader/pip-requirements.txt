@@ -4,4 +4,3 @@
 # which the script imports but upstream never declared.
 elasticsearch==9.1.0
 tqdm==4.67.1
-nltk==3.9.1

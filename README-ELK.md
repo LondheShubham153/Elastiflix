@@ -40,16 +40,16 @@ That's it. There's no step 2.
 | `./start.sh` | Prepares the catalogue, starts all seven containers, waits, prints the URLs |
 | `./stop.sh` | Stops everything, keeps your data |
 | `./uninstall.sh` | Removes everything including volumes |
+| `./generate-traffic.sh` | Fires 54 realistic searches (18 queries × 3 rounds, including deliberate zero-result ones) so the Kibana dashboard isn't empty |
 
-Optional helpers in `elk/setup/`:
+`start.sh` also creates the three Kibana data views for you, so Discover works
+the moment it prints the URLs.
 
-| Script | What it's for |
-|---|---|
-| `prepull.sh` | Pull and build every image up front — **run this before recording** |
-| `generate-traffic.sh` | Fires ~36 realistic searches (including deliberate zero-result ones) so the Kibana dashboard isn't empty |
-| `kibana-dataviews.sh` | Creates the three data views, if you'd rather not make them by hand |
-| `export-kibana.sh` | Saves your dashboard to `elk/kibana/` once you've built it |
-| `import-kibana.sh` | Restores it. The escape hatch if a live build goes wrong |
+Before recording, cache the images so a slow pull can't stall a take:
+
+```bash
+docker compose pull && docker compose build
+```
 
 Then:
 
