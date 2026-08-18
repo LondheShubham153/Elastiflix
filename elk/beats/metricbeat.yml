@@ -30,6 +30,12 @@ output.elasticsearch:
 
 # Load Metricbeat's prebuilt dashboards into Kibana automatically. This is the
 # "you get a dashboard for free" moment -- no manual panel building required.
+#
+# TIMING NOTE FOR RECORDING: this loads ~112 dashboards and BLOCKS metric
+# publishing while it runs -- 3-5 minutes on a first start with empty volumes.
+# `metricbeat-*` staying at zero docs for the first few minutes is expected,
+# not a failure. Start the stack well before you need this segment. Set this
+# to false if you'd rather have metrics immediately and skip the dashboards.
 setup.kibana:
   host: "${KIBANA_HOST}"
 setup.dashboards.enabled: true
