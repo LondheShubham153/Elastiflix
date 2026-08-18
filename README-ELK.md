@@ -30,20 +30,26 @@ git clone https://github.com/LondheShubham153/Elastiflix.git
 cd Elastiflix
 git checkout elk-one-shot
 
-./elk/setup/00-prepull.sh       # pull + build everything up front
-./elk/setup/01-prepare-data.sh  # movies.json.gz -> NDJSON for Logstash
-./elk/setup/02-start-stack.sh   # bring the whole stack up
+./start.sh
 ```
 
-The remaining scripts are optional helpers:
+That's it. There's no step 2.
+
+| | |
+|---|---|
+| `./start.sh` | Prepares the catalogue, starts all seven containers, waits, prints the URLs |
+| `./stop.sh` | Stops everything, keeps your data |
+| `./uninstall.sh` | Removes everything including volumes |
+
+Optional helpers in `elk/setup/`:
 
 | Script | What it's for |
 |---|---|
-| `03-generate-traffic.sh` | Fires ~36 realistic searches (including deliberate zero-result ones) so the Kibana dashboard isn't empty |
-| `04-kibana-dataviews.sh` | Creates the three data views — already run by `02` |
-| `05-export-kibana.sh` | Saves your dashboard to `elk/kibana/` once you've built it |
-| `06-import-kibana.sh` | Restores it. The escape hatch if a live build goes wrong |
-| `99-teardown.sh` | Full cleanup including volumes |
+| `prepull.sh` | Pull and build every image up front — **run this before recording** |
+| `generate-traffic.sh` | Fires ~36 realistic searches (including deliberate zero-result ones) so the Kibana dashboard isn't empty |
+| `kibana-dataviews.sh` | Creates the three data views, if you'd rather not make them by hand |
+| `export-kibana.sh` | Saves your dashboard to `elk/kibana/` once you've built it |
+| `import-kibana.sh` | Restores it. The escape hatch if a live build goes wrong |
 
 Then:
 
@@ -61,14 +67,14 @@ curl -s localhost:9200/elastiflix-movies/_count
 # -> {"count":6959,...}
 ```
 
-Tear it all down with `./elk/setup/99-teardown.sh`.
+Tear it all down with `./uninstall.sh`.
 
 ---
 
 ## What this fork changes
 
-Everything new lives in `elk/`. Only four upstream files were touched, so you can diff this
-branch against `upstream/main` and see exactly what was added.
+Configs live in `elk/`; the compose file and the three scripts sit at the repo root. Diff this
+branch against `upstream/main` to see exactly what changed.
 
 ### 1. Structured logging in the backend — `backend/src/logger.js`
 
@@ -134,12 +140,12 @@ worth knowing. It starts **Elasticsearch and Kibana only** — no Logstash, no B
 of the four components this project teaches aren't in it, we'd need a compose file anyway, and
 running both means two networks plus wiring its generated API key into three configs.
 
-`elk/docker-compose.elk.yml` starts all five together instead. See `LEARN.md` §11 for what
-`start-local` does, when to prefer it, and how to try it.
+The single root `docker-compose.yml` starts all seven together instead. See `LEARN.md` §11
+for what `start-local` does, when to prefer it, and how to try it.
 
 ## A note on security
 
-`xpack.security.enabled=false` in `elk/docker-compose.elk.yml`. That is deliberate: this is a
+`xpack.security.enabled=false` in `docker-compose.yml`. That is deliberate: this is a
 local teaching demo and it removes passwords, TLS certificates and API keys as things that can
 break mid-lesson. **Never run a real cluster this way.**
 

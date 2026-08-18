@@ -10,7 +10,7 @@ repo before being written down — the numbers are real output.
 **Part 2 — this repo** (10) every file explained · (11) `start-local`, the official quickstart ·
 (12) every action in order · (13) changes to the app · (14) docs
 
-Start the stack first: `./elk/setup/02-start-stack.sh`
+Start the stack first: `./start.sh`
 
 ---
 
@@ -82,7 +82,8 @@ up. That inversion is the whole trick.
 - `text` → analyzed, full-text searchable, **cannot aggregate or sort**
 - `keyword` → exact value, **aggregatable** — needed for facets, terms aggs, dashboards
 
-That's why templates get applied *before* any data arrives in `02-start-stack.sh`.
+That's why Logstash installs the templates itself, at startup, before a single document is
+sent (see §10).
 
 ---
 
@@ -248,28 +249,38 @@ Kibana stores no data. Every panel is a query run when you look at it.
 
 ## 10. The repo, file by file
 
-Everything we added lives in `elk/`, plus four surgical edits to upstream files. Nothing else
-was touched — you can diff this branch against `upstream/main` and see the whole change.
+One compose file at the root holds the whole architecture. Configs live in `elk/`.
 
 ```
+docker-compose.yml               ALL SEVEN SERVICES — the architecture
+start.sh / stop.sh / uninstall.sh
 elk/
-├── docker-compose.elk.yml          the whole stack in one file
 ├── logstash/
 │   ├── pipeline/movies.conf        loads the movie catalogue
 │   ├── pipeline/logs.conf          receives + parses app logs
 │   ├── config/pipelines.yml        keeps those two apart
 │   ├── config/logstash.yml         Logstash's own settings
-│   └── templates/*.json            mappings, applied before any data
+│   └── templates/*.json            mappings, installed by Logstash itself
 ├── beats/filebeat.yml              ships logs
 ├── beats/metricbeat.yml            ships metrics
-├── setup/00..06, 99                every action, scripted
+├── setup/*.sh                      optional helpers
 ├── kibana/*.ndjson                 saved dashboard (the escape hatch)
 └── slides/index.html               the theory deck
 ```
 
-### `docker-compose.elk.yml` — the stack
+### `docker-compose.yml` — the architecture
 
-Five services on one network. The lines that matter:
+Seven services, three groups. **Every service is something you're learning** — there are no
+utility or init containers to explain away, which is the point.
+
+```
+SEARCH ENGINE      INGEST              THE APP
+elasticsearch      logstash            backend
+kibana             filebeat            frontend
+                   metricbeat
+```
+
+The lines that matter:
 
 | Setting | Why |
 |---|---|
@@ -278,7 +289,19 @@ Five services on one network. The lines that matter:
 | `ES_JAVA_OPTS=-Xms1g -Xmx1g` | Pin the heap. Unset, ES grabs a share of host RAM and starves everything else. |
 | `bootstrap.memory_lock=true` | Stop the JVM heap being swapped to disk — swapping wrecks search latency. |
 | `healthcheck` accepting `yellow` | On one node yellow is *correct*. Demanding green would hang forever. |
-| `depends_on: condition: service_healthy` | Logstash starting before ES is up is the #1 cause of a broken first run. |
+| `depends_on: service_healthy` | The dependency graph **is** the architecture diagram — read it top to bottom and you have the data flow. |
+
+**Read the `depends_on` chain** — it's the most useful thing in the file:
+
+```
+elasticsearch (healthy)
+   ├── kibana ────────────── metricbeat
+   ├── logstash (healthy) ── filebeat
+   └── backend ──────────── frontend
+```
+
+Filebeat waits for Logstash to be *healthy*, not merely started — otherwise its first batches
+die with `connection reset by peer` because nothing is listening on 5044 yet.
 
 Filebeat and Metricbeat mount `/var/run/docker.sock` read-only — that's how they see other
 containers. They expose no ports because they only push.
@@ -333,7 +356,17 @@ startup error, not a warning — the container exits instantly. Most tutorials s
 
 ### `logstash/templates/*.json` — the mappings
 
-Applied *before* any document arrives. `movies-template.json` is upstream's `schema.json` minus
+**Logstash installs these itself**, at startup, before a single document is sent — via
+`manage_template` / `template` / `template_name` on the `elasticsearch` output:
+
+```ruby
+manage_template    => true
+template           => "/usr/share/logstash/templates/movies-template.json"
+template_name      => "elastiflix-movies"
+template_overwrite => true
+```
+
+That ordering guarantee is the whole reason it lives there rather than in a setup script. `movies-template.json` is upstream's `schema.json` minus
 the ELSER fields (`plot_elser`, `plot_e5`, and the `copy_to` on `plot`).
 
 `logs-template.json` exists for one reason: **`search_query` must be `keyword`.** Let dynamic
@@ -397,7 +430,8 @@ would still need a compose file of their own — so you'd be running two compose
 two networks, and (because security is on) hand-wiring the generated API key into three separate
 configs. More moving parts, on the one component that was never the hard bit.
 
-`elk/docker-compose.elk.yml` starts all five together, on one network, with no credentials.
+Our single root `docker-compose.yml` starts all seven together, with no credentials, from
+`./start.sh`.
 
 ### When you *should* use it
 
@@ -412,7 +446,7 @@ so you can keep several installs side by side, but the ports are written as `920
 regardless — there's no port override, so the clash is unavoidable.)
 
 ```bash
-./elk/setup/99-teardown.sh
+./uninstall.sh
 curl -fsSL https://elastic.co/start-local | sh
 
 cd elastic-start-local
@@ -436,21 +470,43 @@ curl -u elastic:$ES_LOCAL_PASSWORD localhost:9200
 
 ## 12. Every action, in order
 
-| # | Command | What actually happens |
-|---|---|---|
-| 0 | `00-prepull.sh` | Pulls all 5 Elastic images and pre-builds the app. Do this **before** you record — a stalled pull is the most common way a live demo dies. |
-| 1 | `01-prepare-data.sh` | Decompresses `movies.json.gz` (one big JSON array) into `movies.ndjson`, one document per line. Logstash's `json` codec reads line-by-line; streaming 6,959 lines beats parsing a 40 MB array. |
-| 2 | `02-start-stack.sh` | ES + Kibana → wait for health → **apply both templates** → start Logstash/Beats → start the app → create data views. Order is the whole point: templates land before data. |
-| 3 | `03-generate-traffic.sh` | Fires ~36 searches, including deliberate zero-result ones (`zzzzz`, `asdfgh`). An empty dashboard is a boring dashboard. |
-| 4 | `04-kibana-dataviews.sh` | Creates the three data views. Already called by step 2; standalone for re-runs. |
-| 5 | `05-export-kibana.sh` | Saves your dashboard to `kibana/*.ndjson`. Scoped to Elastiflix objects — an unfiltered export drags in Metricbeat's ~950 saved objects. |
-| 6 | `06-import-kibana.sh` | Restores it. **The escape hatch** if a live build goes wrong on camera. |
-| 99 | `99-teardown.sh` | Removes containers *and volumes*. Run it between rehearsals to prove reproducibility. |
+```bash
+./start.sh      # everything
+./stop.sh       # stop, keep data
+./uninstall.sh  # stop, wipe data
+```
+
+`start.sh` does exactly three things, and you can run any of them by hand:
+
+| Step | What actually happens |
+|---|---|
+| 1. Prepare | Decompresses `movies.json.gz` (one big JSON array) into `elk/data/movies.ndjson`, one document per line. Logstash's `json` codec reads line-by-line; streaming 6,959 lines beats parsing a 40 MB array. Skipped if the file already exists. |
+| 2. `docker compose up -d` | Starts all seven containers. `depends_on` handles the ordering — Elasticsearch healthy before Kibana/Logstash/backend, Logstash healthy before Filebeat. |
+| 3. Wait | Polls until Elasticsearch, Kibana and the 6,959-document catalogue are all ready, then prints the URLs. |
+
+**For the progressive reveal on camera**, bring services up one at a time from the same file:
+
+```bash
+docker compose up -d elasticsearch kibana   # "here's the engine and the UI"
+docker compose up -d logstash               # "now let's get data in"
+docker compose up -d filebeat metricbeat    # "now let's watch the app"
+docker compose up -d backend frontend       # "and here's the app itself"
+```
+
+Optional helpers in `elk/setup/`:
+
+| Script | For |
+|---|---|
+| `prepull.sh` | Pull + build every image up front. **Run before recording.** |
+| `generate-traffic.sh` | ~36 searches, including deliberate zero-result ones, so the dashboard isn't empty |
+| `kibana-dataviews.sh` | Creates the three data views, if you'd rather not do it by hand |
+| `export-kibana.sh` / `import-kibana.sh` | Save / restore your dashboard — the escape hatch |
 
 ### What to verify at each stage
 
 ```bash
 curl -s localhost:9200/_cluster/health                 # yellow = fine on one node
+curl -s localhost:9200/_index_template/elastiflix-logs # Logstash installed this
 curl -s localhost:9200/elastiflix-movies/_count        # 6959
 curl -s 'localhost:9200/elastiflix-logs-*/_count'      # grows as you search
 curl -s 'localhost:9200/_cat/indices?v'                # the whole picture
