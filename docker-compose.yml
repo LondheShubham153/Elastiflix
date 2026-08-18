@@ -16,7 +16,9 @@
 #                          (no transform needed, so it skips Logstash)   │
 #    you ──► FRONTEND ──► BACKEND ──────────────────────────────────────►┘
 #
-#  Start it with ./start.sh  (or just: docker compose up -d)
+#  Start it with ./start.sh — not `docker compose up -d`. The catalogue at
+#  elk/data/movies.ndjson is generated, not committed; compose alone would
+#  bind-mount an empty directory and Logstash would index nothing.
 #
 #  SECURITY: xpack.security is disabled on purpose. This is a local teaching
 #  demo — it removes passwords, TLS certs and API keys as moving parts.
@@ -123,6 +125,8 @@ services:
     environment:
       - ES_HOST=http://elasticsearch:9200
       - KIBANA_HOST=http://kibana:5601
+      # Set to false to skip the 3-5 minute dashboard reload between takes.
+      - METRICBEAT_SETUP_DASHBOARDS=${METRICBEAT_SETUP_DASHBOARDS:-true}
     volumes:
       - ./elk/beats/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

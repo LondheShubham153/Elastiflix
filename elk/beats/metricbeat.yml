@@ -32,13 +32,16 @@ output.elasticsearch:
 # "you get a dashboard for free" moment -- no manual panel building required.
 #
 # TIMING NOTE FOR RECORDING: this loads ~112 dashboards and BLOCKS metric
-# publishing while it runs -- 3-5 minutes on a first start with empty volumes.
-# `metricbeat-*` staying at zero docs for the first few minutes is expected,
-# not a failure. Start the stack well before you need this segment. Set this
-# to false if you'd rather have metrics immediately and skip the dashboards.
+# publishing while it runs -- 3-5 minutes. Metricbeat keeps no "already
+# loaded" marker, so it does this on EVERY container start, not just the
+# first: a ./stop.sh + ./start.sh between takes costs you the wait again.
+# `metricbeat-*` staying at zero docs meanwhile is expected, not a failure.
+#
+# Once you have the dashboards, skip the reload for the rest of the session:
+#     METRICBEAT_SETUP_DASHBOARDS=false ./start.sh
 setup.kibana:
   host: "${KIBANA_HOST}"
-setup.dashboards.enabled: true
+setup.dashboards.enabled: ${METRICBEAT_SETUP_DASHBOARDS:true}
 setup.ilm.enabled: false
 
 logging.level: info
