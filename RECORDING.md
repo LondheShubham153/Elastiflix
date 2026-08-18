@@ -62,6 +62,21 @@ docker compose logs -f filebeat
 ### 1. Slides (~30 min)
 `elk/slides/index.html` in the browser. Nothing running yet.
 
+### 1b. The destination (optional, 30 seconds)
+
+`./start.sh` loads three prebuilt dashboards. Opening **Elastiflix — Search
+Overview** for ten seconds before you explain anything gives the audience a
+picture of where the next hour lands. Then close it and start from nothing.
+
+| Dashboard | Data view | Shows |
+|---|---|---|
+| **Elastiflix — Search Overview** | app logs | searches over time, top terms, zero-result count, median vs p95 latency |
+| **Elastiflix — Infrastructure** | metricbeat | container CPU and memory, scoped to this stack's seven containers |
+| **Elastiflix — Movie Catalogue** | movies | 6,959 count, genres, releases per year, languages |
+
+Reload them any time with `./load-dashboards.sh` — this is your real escape
+hatch if a live build goes wrong.
+
 ### 2. The architecture, before anything starts
 
 Editor, `docker-compose.yml`, from the top. The header comment is the diagram —
@@ -286,7 +301,6 @@ before you keep fiddling.
 | Movie count stuck below 6959 | `./uninstall.sh && ./start.sh` — a truncated NDJSON can't happen now, but a wiped index can. |
 | Everything is wedged | `./uninstall.sh && ./start.sh` is 38 seconds. Cut, rebuild, resume. |
 
-There is no saved-dashboard escape hatch in this repo — it was removed because
-the committed export contained no dashboard and restored nothing. If you want
-one, build the dashboard, then export it from Kibana's Saved Objects UI and
-commit it before recording.
+**Escape hatch:** `./load-dashboards.sh` restores all three prebuilt dashboards
+in about a second. If a live build goes wrong, run it, open the finished
+version, and keep talking.

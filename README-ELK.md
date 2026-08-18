@@ -40,10 +40,12 @@ That's it. There's no step 2.
 | `./start.sh` | Prepares the catalogue, starts all seven containers, waits, prints the URLs |
 | `./stop.sh` | Stops everything, keeps your data |
 | `./uninstall.sh` | Removes everything including volumes |
+| `./load-dashboards.sh` | Reloads the three prebuilt Kibana dashboards (`./start.sh` already does this) |
 | `./generate-traffic.sh` | Fires 54 realistic searches (18 queries × 3 rounds, including deliberate zero-result ones) so the Kibana dashboard isn't empty |
 
-`start.sh` also creates the three Kibana data views for you, so Discover works
-the moment it prints the URLs.
+`start.sh` also creates the three Kibana data views and loads three prebuilt
+dashboards — Search Overview, Infrastructure and Movie Catalogue — so there is
+something to look at the moment it prints the URLs.
 
 Before recording, cache the images so a slow pull can't stall a take:
 

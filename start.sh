@@ -94,6 +94,13 @@ data_view "elastiflix-movies"  "elastiflix-movies" "release_date" "Elastiflix Mo
 data_view "elastiflix-logs"    "elastiflix-logs-*" "@timestamp"   "Elastiflix App Logs"
 data_view "elastiflix-metrics" "metricbeat-*"      "@timestamp"   "Elastiflix Metrics"
 
+# --- 5. The prebuilt dashboards --------------------------------------------
+# Three ready-made dashboards so there is something to show immediately. You
+# still build one live on camera -- these are the safety net, and the "here is
+# where we are going" shot before you start.
+echo "==> Loading the prebuilt dashboards"
+./load-dashboards.sh | grep -v '^==>' || true
+
 cat <<EOF
 
   ────────────────────────────────────────────────
@@ -108,6 +115,10 @@ cat <<EOF
    Kibana → Discover to watch your own searches
    arrive as documents.
 
+   Three dashboards are already loaded:
+   Kibana → Dashboards → "Elastiflix — ..."
+
    Need traffic to chart?   ./generate-traffic.sh
+   Reload the dashboards?   ./load-dashboards.sh
    Stop it with             ./stop.sh
 EOF

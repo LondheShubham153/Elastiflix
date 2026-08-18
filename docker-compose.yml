@@ -61,6 +61,13 @@ services:
     container_name: kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      # Two banners Kibana shows by default that you do not want on camera:
+      # the telemetry opt-in bar across the top, and a persistent "Your data
+      # is not secure" toast in the bottom-right (expected -- security is off
+      # on purpose here, and the toast covers dashboard panels).
+      - TELEMETRY_OPTIN=false
+      - TELEMETRY_ENABLED=false
+      - XPACK_SECURITY_SHOWINSECURECLUSTERWARNING=false
     ports:
       - "5601:5601"
     depends_on:
