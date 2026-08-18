@@ -1,0 +1,14 @@
+# Two separate pipelines in one Logstash instance.
+#
+# GOTCHA worth calling out on camera: if you just point path.config at a
+# directory, Logstash CONCATENATES every .conf file into one pipeline -- so
+# your movie loader and your log receiver would end up wired into each other.
+# pipelines.yml keeps them properly isolated.
+
+- pipeline.id: movies
+  path.config: "/usr/share/logstash/pipeline/movies.conf"
+  pipeline.workers: 2
+
+- pipeline.id: applogs
+  path.config: "/usr/share/logstash/pipeline/logs.conf"
+  pipeline.workers: 1

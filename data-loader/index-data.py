@@ -16,11 +16,11 @@ def main():
     parser = argparse.ArgumentParser()
     
     # Required arguments
-    parser.add_argument('--data_folder', dest='data_folder', required=False, default='movies')
+    parser.add_argument('--data_folder', dest='data_folder', required=False, default='elastiflix-movies')
     parser.add_argument('--config_folder', dest='config_folder', required=False, default='config')
     parser.add_argument('--es_api_key', dest='es_api_key', required=True)
     parser.add_argument('--es_host', dest='es_host', required=True)
-    parser.add_argument('--index_name', dest='index_name', required=False, default='movies')
+    parser.add_argument('--index_name', dest='index_name', required=False, default='elastiflix-movies')
     parser.add_argument('--recreate', dest='recreate', action=argparse.BooleanOptionalAction, required=False, default=False)
     parser.add_argument('--create_inference_endpoints', dest='create_inference_endpoints', action=argparse.BooleanOptionalAction, required=False, default=False)
 
@@ -84,7 +84,7 @@ def main():
         movies_json = json.load(file)
 
     progress = tqdm(unit="docs", total=len(movies_json))
-    for ok, action in helpers.parallel_bulk(es_client, actions_generator(movies_json, args.index_name), chunk_size=10):
+    for ok, action in helpers.parallel_bulk(es_client, actions_generator(movies_json, args.index_name), chunk_size=500):
         progress.update(1)
 
     es_client.indices.put_settings(index=args.index_name, settings={'index.number_of_replicas': 1})

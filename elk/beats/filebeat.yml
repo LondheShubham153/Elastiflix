@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Filebeat: ship Elastiflix container logs -> Logstash
+#
+# Filebeat is deliberately dumb. It tails files, remembers its position, and
+# forwards lines. It does NOT parse -- that is Logstash's job (logs.conf).
+# That division of labour is the whole point of the Beats tier.
+#
+# VERSION NOTE: nearly every Filebeat + Docker tutorial online still uses
+# `type: container`. That input was REMOVED in 9.x -- it now fails with
+# "Container input is deprecated" and silently ships nothing. The modern form
+# is `filestream` with a `container` parser, below.
+# ---------------------------------------------------------------------------
+
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      hints.enabled: false
+      templates:
+        # Both our containers are named elastiflix-* . Matching on that prefix
+        # keeps us off Elasticsearch's own very chatty JVM logs -- and off any
+        # unrelated containers you happen to have running.
+        - condition:
+            contains.docker.container.name: "elastiflix"
+          config:
+            - type: filestream
+              # Each discovered container needs its own stable input id.
+              id: elastiflix-${data.docker.container.id}
+              paths:
+                - /var/lib/docker/containers/${data.docker.container.id}/*.log
+              parsers:
+                # Unwraps Docker's {"log":"...","stream":"stdout"} envelope so
+                # `message` is the actual application line.
+                - container:
+                    stream: all
+                    format: auto
+
+processors:
+  # Attach which container a line came from, so you can filter in Kibana.
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+  # Drop Filebeat's own bookkeeping fields we don't need.
+  - drop_fields:
+      fields: ["agent.ephemeral_id", "agent.id", "agent.version", "ecs.version"]
+      ignore_missing: true
+
+# Ship to Logstash, NOT straight to Elasticsearch, so the full
+# Beats -> Logstash -> Elasticsearch -> Kibana path is visible.
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info

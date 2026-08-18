@@ -1,0 +1,8 @@
+# Logstash 8+ renamed http.* to api.* -- using the old name is a fatal
+# startup error, not a warning.
+api.http.host: "0.0.0.0"
+
+log.level: info
+
+# start-local / this demo runs a basic-licence cluster, so no X-Pack monitoring.
+xpack.monitoring.enabled: false

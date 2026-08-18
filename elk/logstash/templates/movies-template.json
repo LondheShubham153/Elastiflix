@@ -1,0 +1,45 @@
+{
+  "index_patterns": ["elastiflix-movies"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "5s"
+    },
+    "mappings": {
+      "properties": {
+        "id":                   { "type": "keyword" },
+        "imdb_id":              { "type": "keyword" },
+        "title":                { "type": "text" },
+        "original_title":       { "type": "text" },
+        "original_language":    { "type": "keyword" },
+        "overview":             { "type": "text" },
+        "plot":                 { "type": "text" },
+        "tagline":              { "type": "keyword" },
+        "genres":               { "type": "keyword" },
+        "cast":                 { "type": "keyword" },
+        "spoken_languages":     { "type": "keyword" },
+        "production_companies": { "type": "keyword" },
+        "production_countries": { "type": "keyword" },
+        "status":               { "type": "keyword" },
+        "rating":               { "type": "keyword" },
+        "homepage":             { "type": "keyword" },
+        "backdrop_path":        { "type": "keyword" },
+        "poster_path":          { "type": "text" },
+        "release_date":         { "type": "date", "format": "yyyy-MM-dd" },
+        "runtime":              { "type": "integer" },
+        "vote_count":           { "type": "integer" },
+        "vote_average":         { "type": "float" },
+        "user_score":           { "type": "float" },
+        "popularity":           { "type": "float" },
+        "budget":               { "type": "float" },
+        "revenue":              { "type": "float" },
+        "adult":                { "type": "boolean" },
+        "video":                { "type": "boolean" },
+        "keywords":             { "type": "nested" },
+        "belongs_to_collection":{ "type": "nested" }
+      }
+    }
+  }
+}
