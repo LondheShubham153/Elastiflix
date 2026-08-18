@@ -77,13 +77,19 @@ That's why templates get applied *before* any data arrives in `02-start-stack.sh
 
 ## 4. Elasticsearch by hand
 
-Run these in **Kibana → Dev Tools**, or with curl against `localhost:9200`.
+Run these in **[Kibana → Dev Tools](http://localhost:5601/app/dev_tools#/console)** — paste the
+block and hit ▶ on each request.
 
-```bash
+> **Not in a browser address bar.** A browser can only send `GET`, so the `POST` below simply
+> cannot run there. The `GET /path` + JSON-body syntax is Dev Tools' own shorthand — it is not a
+> URL and it is not curl. The curl equivalents are further down.
+
+```
 # Is it alive?
 GET /
 
-# Index one document
+# Index one document. This ALSO creates the index -- there is no "CREATE TABLE"
+# step in Elasticsearch. Skip this and the next request 404s.
 POST /playground/_doc/1
 { "title": "The Matrix", "year": 1999, "genres": ["Action", "Sci-Fi"] }
 
@@ -94,6 +100,25 @@ GET /playground/_doc/1
 GET /playground/_search
 { "query": { "match": { "title": "matrix" } } }
 ```
+
+Same thing with curl, if you'd rather stay in the terminal:
+
+```bash
+curl localhost:9200
+
+curl -X POST localhost:9200/playground/_doc/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"The Matrix","year":1999,"genres":["Action","Sci-Fi"]}'
+
+curl localhost:9200/playground/_doc/1
+
+curl localhost:9200/playground/_search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":{"match":{"title":"matrix"}}}'
+```
+
+> **`index_not_found_exception` is the expected first answer** if you run the `GET` before the
+> `POST`. Worth demoing deliberately: the index does not exist until a document lands in it.
 
 Against the real catalogue:
 
