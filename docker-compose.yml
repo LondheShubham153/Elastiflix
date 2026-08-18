@@ -1,6 +1,14 @@
+# Elastiflix app services.
+#
+# FORK CHANGE: upstream pointed ES_HOST at a placeholder Elastic Cloud URL and
+# required you to paste an API key by hand. This version talks to the local
+# Elasticsearch started by elk/docker-compose.elk.yml, so the whole project
+# runs with no signup and no credentials.
+
 services:
   elastiflix:
     build: ./frontend
+    container_name: elastiflix-frontend
     ports:
       - "3000:3000"
     environment:
@@ -11,17 +19,30 @@ services:
       - ./frontend/src:/app/src
     depends_on:
       - backend
+    networks:
+      - elastiflix-net
 
   backend:
     build: ./backend
+    container_name: elastiflix-backend
     ports:
       - "17700:17700"
     environment:
       - LOCAL=true
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
-      - ES_HOST=https://es_host_here.es.us-east-1.aws.elastic.cloud:443
-      - ES_API_KEY=api_key_here
-      - ES_INDEX=elastiflix-movies
+      # Container-to-container: `elasticsearch` is the service name on the
+      # shared elastiflix-net network created by the ELK compose file.
+      - ES_HOST=${ES_HOST:-http://elasticsearch:9200}
+      - ES_INDEX=${ES_INDEX:-elastiflix-movies}
+      - ES_API_KEY=
     volumes:
       - ./backend/src:/app/src
+    networks:
+      - elastiflix-net
+
+# Joins the network the ELK stack creates, so bring that up first.
+networks:
+  elastiflix-net:
+    external: true
+    name: elastiflix-net

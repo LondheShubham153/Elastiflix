@@ -2,3 +2,6 @@ src/streaming-ui/scripts/.env-debug
 src/data-loader/env-debug
 node_modules/
 data-loader/movies/tmp/
+
+# ELK one-shot: generated at setup time from data-loader/movies/movies.json.gz
+elk/data/movies.ndjson

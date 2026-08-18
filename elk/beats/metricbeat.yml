@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# Metricbeat: ship container + Elasticsearch metrics -> Elasticsearch
+#
+# Note this one goes DIRECT to Elasticsearch. Not everything needs Logstash --
+# if you have no transformation to do, skip the hop. Worth saying out loud:
+# Logstash is a choice, not a mandatory tax.
+# ---------------------------------------------------------------------------
+
+metricbeat.modules:
+
+  # Per-container CPU, memory, network and disk.
+  - module: docker
+    metricsets: ["container", "cpu", "diskio", "memory", "network"]
+    hosts: ["unix:///var/run/docker.sock"]
+    period: 10s
+    enabled: true
+
+  # Elasticsearch monitoring itself -- a nice "it watches its own house" beat.
+  - module: elasticsearch
+    metricsets: ["node", "node_stats", "index"]
+    hosts: ["http://elasticsearch:9200"]
+    period: 30s
+    enabled: true
+
+processors:
+  - add_docker_metadata: ~
+
+output.elasticsearch:
+  hosts: ["${ES_HOST}"]
+
+# Load Metricbeat's prebuilt dashboards into Kibana automatically. This is the
+# "you get a dashboard for free" moment -- no manual panel building required.
+setup.kibana:
+  host: "${KIBANA_HOST}"
+setup.dashboards.enabled: true
+setup.ilm.enabled: false
+
+logging.level: info

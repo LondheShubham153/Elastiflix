@@ -1,0 +1,26 @@
+{
+  "index_patterns": ["elastiflix-logs-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "search_query": { "type": "keyword" },
+        "search_type":  { "type": "keyword" },
+        "http_method":  { "type": "keyword" },
+        "http_path":    { "type": "keyword" },
+        "http_status":  { "type": "integer" },
+        "log_level":    { "type": "keyword" },
+        "duration_ms":  { "type": "float" },
+        "result_count": { "type": "integer" },
+        "service":      { "type": "keyword" },
+        "message":      { "type": "text" },
+        "tags":         { "type": "keyword" }
+      }
+    }
+  }
+}
