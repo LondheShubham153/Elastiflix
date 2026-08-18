@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 KB="${KB:-http://localhost:5601}"
 SRC="kibana/elastiflix-dashboard.ndjson"
 
-[[ -f "$SRC" ]] || { echo "ERROR: $SRC not found -- run 05-export-kibana.sh first" >&2; exit 1; }
+[[ -f "$SRC" ]] || { echo "ERROR: $SRC not found -- run export-kibana.sh first" >&2; exit 1; }
 
 echo "==> Importing $SRC into $KB"
 curl -fs -X POST "$KB/api/saved_objects/_import?overwrite=true" \

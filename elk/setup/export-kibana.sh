@@ -7,7 +7,7 @@
 # references so the visualisations come along.
 #
 # Run it AFTER you've built the dashboard you like, then commit the result --
-# 06-import-kibana.sh restores it if the live build goes sideways on camera.
+# import-kibana.sh restores it if the live build goes sideways on camera.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 KB="${KB:-http://localhost:5601}"
