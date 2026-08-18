@@ -127,6 +127,16 @@ Start the stack before you need it.
 
 ---
 
+## Why not Elastic's `start-local`?
+
+Elastic's docs point at a one-liner (`curl -fsSL https://elastic.co/start-local | sh`), and it's
+worth knowing. It starts **Elasticsearch and Kibana only** — no Logstash, no Beats. Since three
+of the four components this project teaches aren't in it, we'd need a compose file anyway, and
+running both means two networks plus wiring its generated API key into three configs.
+
+`elk/docker-compose.elk.yml` starts all five together instead. See `LEARN.md` §11 for what
+`start-local` does, when to prefer it, and how to try it.
+
 ## A note on security
 
 `xpack.security.enabled=false` in `elk/docker-compose.elk.yml`. That is deliberate: this is a
