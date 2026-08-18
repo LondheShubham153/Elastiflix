@@ -1,9 +1,20 @@
 # Elastic Stack — Notes
 
-Minimal notes to learn from and teach with. Examples run against the stack in this repo
-(`./elk/setup/02-start-stack.sh`), so everything here is copy-pasteable.
+Minimal notes to learn from and teach with. Every command was run against the live stack in this
+repo before being written down — the numbers are real output.
+
+**Part 1 — the concepts** (1) why it exists · (2) the components · (3) vocabulary ·
+(4) Elasticsearch by hand · (5) Logstash · (6) Beats · (7) Kibana · (8) where it's used ·
+(9) misconceptions
+
+**Part 2 — this repo** (10) every file explained · (11) every action in order ·
+(12) changes to the app · (13) docs
+
+Start the stack first: `./elk/setup/02-start-stack.sh`
 
 ---
+
+# Part 1 — The concepts
 
 ## 1. Why it exists
 
@@ -233,7 +244,194 @@ Kibana stores no data. Every panel is a query run when you look at it.
 
 ---
 
-## 10. Docs
+# Part 2 — This repo
+
+## 10. The repo, file by file
+
+Everything we added lives in `elk/`, plus four surgical edits to upstream files. Nothing else
+was touched — you can diff this branch against `upstream/main` and see the whole change.
+
+```
+elk/
+├── docker-compose.elk.yml          the whole stack in one file
+├── logstash/
+│   ├── pipeline/movies.conf        loads the movie catalogue
+│   ├── pipeline/logs.conf          receives + parses app logs
+│   ├── config/pipelines.yml        keeps those two apart
+│   ├── config/logstash.yml         Logstash's own settings
+│   └── templates/*.json            mappings, applied before any data
+├── beats/filebeat.yml              ships logs
+├── beats/metricbeat.yml            ships metrics
+├── setup/00..06, 99                every action, scripted
+├── kibana/*.ndjson                 saved dashboard (the escape hatch)
+└── slides/index.html               the theory deck
+```
+
+### `docker-compose.elk.yml` — the stack
+
+Five services on one network. The lines that matter:
+
+| Setting | Why |
+|---|---|
+| `discovery.type=single-node` | Don't look for peers. One node is the whole cluster. |
+| `xpack.security.enabled=false` | **Demo only.** Removes passwords, TLS and API keys as failure modes. Never in production. |
+| `ES_JAVA_OPTS=-Xms1g -Xmx1g` | Pin the heap. Unset, ES grabs a share of host RAM and starves everything else. |
+| `bootstrap.memory_lock=true` | Stop the JVM heap being swapped to disk — swapping wrecks search latency. |
+| `healthcheck` accepting `yellow` | On one node yellow is *correct*. Demanding green would hang forever. |
+| `depends_on: condition: service_healthy` | Logstash starting before ES is up is the #1 cause of a broken first run. |
+
+Filebeat and Metricbeat mount `/var/run/docker.sock` read-only — that's how they see other
+containers. They expose no ports because they only push.
+
+### `logstash/pipeline/movies.conf` — the ETL teaching artifact
+
+Replaces `data-loader/index-data.py`. Three stages:
+
+```ruby
+input  { file { path => "/data/movies.ndjson" codec => json mode => "read" } }
+```
+`sincedb_path => "/dev/null"` means "forget what you've already read" — so re-running always
+reloads. Correct for a repeatable demo, wrong for production.
+
+```ruby
+filter {
+  mutate { convert => { "id" => "string" } }                    # int in source, keyword in mapping
+  ruby   { code => "event.set('user_score', ...vote_average)" } # ENRICH: field the UI needs, data lacks
+  date   { match => ["release_date","yyyy-MM-dd"] target => "@timestamp" }
+  if ![title] { drop { } }                                      # quality gate
+}
+```
+
+```ruby
+output { elasticsearch { document_id => "%{id}" } }
+```
+Setting `document_id` makes re-runs **update** rather than duplicate. Omit it and every run
+adds another 6,959 documents.
+
+Uncomment `stdout { codec => rubydebug }` on camera to watch documents mid-flight.
+
+### `logstash/pipeline/logs.conf` — Beats receiver
+
+`input { beats { port => 5044 } }`, then:
+- `json` filter parses our backend's JSON lines (guarded by `if [message] =~ /^\s*\{/`, so
+  non-JSON noise doesn't break the pipeline)
+- `mutate rename` promotes nested fields to top level so they're chartable
+- tags `zero_results` and `slow_request` **at ingest**, so the dashboard doesn't recompute them
+
+Output index is `elastiflix-logs-%{+YYYY.MM.dd}` — one index per day, the standard log pattern.
+
+### `logstash/config/pipelines.yml`
+
+Two pipelines, isolated. **The gotcha it exists to prevent:** point `path.config` at a directory
+and Logstash concatenates every `.conf` into one pipeline — your movie loader and log receiver
+get wired into each other.
+
+### `logstash/config/logstash.yml`
+
+Eight lines. One matters: `api.http.host`. In Logstash 8+ the old `http.host` is a **fatal**
+startup error, not a warning — the container exits instantly. Most tutorials still show the old name.
+
+### `logstash/templates/*.json` — the mappings
+
+Applied *before* any document arrives. `movies-template.json` is upstream's `schema.json` minus
+the ELSER fields (`plot_elser`, `plot_e5`, and the `copy_to` on `plot`).
+
+`logs-template.json` exists for one reason: **`search_query` must be `keyword`.** Let dynamic
+mapping guess and it becomes `text`, and then the top-search-terms panel is impossible —
+"Fielddata is disabled" is the error you'll get.
+
+### `beats/filebeat.yml`
+
+Autodiscovers containers named `elastiflix*` (matching on the prefix keeps Elasticsearch's own
+very chatty JVM logs out).
+
+```yaml
+- type: filestream
+  parsers:
+    - container: { stream: all, format: auto }
+```
+
+**The version trap:** almost every Filebeat+Docker tutorial still teaches `type: container`.
+That input was **removed in 9.x** — it fails with "Container input is deprecated" and silently
+ships nothing. `filestream` + a `container` parser is the modern form. The parser unwraps
+Docker's `{"log":"...","stream":"stdout"}` envelope so `message` is the real application line.
+
+Output goes to **Logstash**, so the full four-hop path stays visible.
+
+### `beats/metricbeat.yml`
+
+`docker` module (cpu, memory, network, diskio) + `elasticsearch` module, so the cluster monitors
+itself. Ships **direct to Elasticsearch** — nothing to transform, so skip the hop.
+
+`setup.dashboards.enabled: true` loads ~112 prebuilt dashboards. **This blocks metric publishing
+for 3–5 minutes on a cold start** — `metricbeat-*` at zero docs early is expected, not a failure.
+
+---
+
+## 11. Every action, in order
+
+| # | Command | What actually happens |
+|---|---|---|
+| 0 | `00-prepull.sh` | Pulls all 5 Elastic images and pre-builds the app. Do this **before** you record — a stalled pull is the most common way a live demo dies. |
+| 1 | `01-prepare-data.sh` | Decompresses `movies.json.gz` (one big JSON array) into `movies.ndjson`, one document per line. Logstash's `json` codec reads line-by-line; streaming 6,959 lines beats parsing a 40 MB array. |
+| 2 | `02-start-stack.sh` | ES + Kibana → wait for health → **apply both templates** → start Logstash/Beats → start the app → create data views. Order is the whole point: templates land before data. |
+| 3 | `03-generate-traffic.sh` | Fires ~36 searches, including deliberate zero-result ones (`zzzzz`, `asdfgh`). An empty dashboard is a boring dashboard. |
+| 4 | `04-kibana-dataviews.sh` | Creates the three data views. Already called by step 2; standalone for re-runs. |
+| 5 | `05-export-kibana.sh` | Saves your dashboard to `kibana/*.ndjson`. Scoped to Elastiflix objects — an unfiltered export drags in Metricbeat's ~950 saved objects. |
+| 6 | `06-import-kibana.sh` | Restores it. **The escape hatch** if a live build goes wrong on camera. |
+| 99 | `99-teardown.sh` | Removes containers *and volumes*. Run it between rehearsals to prove reproducibility. |
+
+### What to verify at each stage
+
+```bash
+curl -s localhost:9200/_cluster/health                 # yellow = fine on one node
+curl -s localhost:9200/elastiflix-movies/_count        # 6959
+curl -s 'localhost:9200/elastiflix-logs-*/_count'      # grows as you search
+curl -s 'localhost:9200/_cat/indices?v'                # the whole picture
+```
+
+> **`_cat/indices` shows 60,596 docs for 6,959 movies.** Not a bug — it counts *nested*
+> documents, and `keywords` and `belongs_to_collection` are `nested` fields. `_count` gives the
+> real 6,959. A nice way to show what `nested` actually costs you.
+
+---
+
+## 12. Changes to the app itself
+
+Four upstream files touched.
+
+### `backend/src/logger.js` — new, and the reason Beats has anything to ship
+
+Upstream logged `console.info("Search request:", state, queryConfig)` — a multi-line object dump
+with no method, status or latency. A log pipeline can't aggregate that.
+
+This emits one JSON object per line:
+
+```json
+{"@timestamp":"...","level":"info","service":"elastiflix-backend","method":"POST",
+ "path":"/api/search","status":200,"duration_ms":42,"query":"matrix","results":7}
+```
+
+`query` is what powers "top search terms". No new npm dependencies — deliberately, so
+`npm install` stays untouched and can't fail on camera.
+
+### `backend/src/Backend.js` — rewired
+
+Each route wrapped in `logged(...)`, which also adds `try/catch`. Upstream had none, so an
+Elasticsearch error became an unhandled rejection and the browser just hung.
+
+### `data-loader/` and `docker-compose.yml` — upstream bugs fixed
+
+| Bug | Fix |
+|---|---|
+| `pip-requirements.txt` pinned `elasticsearch==8.4.0` — predates the `inference.put`/`semantic_text` APIs the script calls, so the loader **could not run as published** | bumped to `9.1.0`, added the undeclared `tqdm` |
+| `index-data.py` defaulted to index `movies` while compose expected `elastiflix-movies` → `index_not_found` | default changed |
+| `parallel_bulk(chunk_size=10)` | raised to 500 |
+| compose pointed at a placeholder Elastic Cloud URL needing a hand-pasted API key | points at local ES, no credentials |
+
+---
+
+## 13. Docs
 
 **Start here**
 - Get started: https://www.elastic.co/docs/get-started
