@@ -1,0 +1,489 @@
+<title>Four Boxes and a Movie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  /* ---- Deck committed to a single dark "projection booth" world ---------- */
+  :root{
+    --ground:#0E1117;
+    --surface:#161B25;
+    --surface-2:#1E2531;
+    --edge:#2B3342;
+    --ink:#EAECF2;
+    --muted:#868FA3;        /* grey biased blue, toward the ground */
+    --amber:#FFB020;        /* marquee light - the one bold colour */
+    --teal:#54B9C9;         /* the data side */
+    --rose:#E5736B;         /* failure / the "before" state */
+
+    --display:"Bricolage Grotesque",Georgia,serif;
+    --body:"Source Sans 3",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+
+    --pad:clamp(1.75rem,5vw,5rem);
+  }
+
+  *{box-sizing:border-box;}
+
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--ground);
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:clamp(1rem,0.55vw + 0.9rem,1.2rem);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---- Slide mechanics --------------------------------------------------- */
+  .deck{position:relative;height:100dvh;overflow:hidden;}
+
+  .slide{
+    position:absolute;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    justify-content:center;
+    gap:1.5rem;
+    padding:var(--pad);
+    padding-bottom:calc(var(--pad) + 2.5rem);
+    overflow-y:auto;
+  }
+  .slide[data-active]{display:flex;animation:rise .38s cubic-bezier(.2,.7,.3,1) both;}
+
+  @keyframes rise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  @media (prefers-reduced-motion:reduce){
+    .slide[data-active]{animation:none;}
+    *{transition:none !important;}
+  }
+
+  .wrap{width:min(1100px,100%);margin:0 auto;display:flex;flex-direction:column;gap:1.4rem;}
+
+  /* ---- Type -------------------------------------------------------------- */
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--amber);
+    margin:0;
+  }
+  h1{
+    font-family:var(--display);
+    font-weight:800;
+    font-size:clamp(2.4rem,6.5vw,5.2rem);
+    line-height:.98;
+    letter-spacing:-.02em;
+    margin:0;
+    text-wrap:balance;
+  }
+  h2{
+    font-family:var(--display);
+    font-weight:600;
+    font-size:clamp(1.9rem,4.2vw,3.1rem);
+    line-height:1.05;
+    letter-spacing:-.015em;
+    margin:0;
+    text-wrap:balance;
+  }
+  .lede{
+    font-size:clamp(1.05rem,1.4vw,1.35rem);
+    color:var(--muted);
+    max-width:62ch;
+    margin:0;
+  }
+
+  ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.85rem;}
+  li{
+    display:flex;
+    gap:.85rem;
+    align-items:baseline;
+    max-width:64ch;
+    font-size:clamp(1.02rem,1.15vw,1.28rem);
+  }
+  li::before{
+    content:"";
+    flex:none;
+    width:.5rem;height:.5rem;
+    margin-top:.5em;
+    background:var(--amber);
+    transform:rotate(45deg);
+  }
+  li b{font-weight:600;color:#fff;}
+
+  code{
+    font-family:var(--mono);
+    font-size:.86em;
+    background:var(--surface-2);
+    border:1px solid var(--edge);
+    padding:.1em .4em;
+    border-radius:3px;
+    color:var(--teal);
+  }
+
+  /* ---- Reusable blocks --------------------------------------------------- */
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem;}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--edge);
+    border-radius:8px;
+    padding:1.1rem 1.2rem;
+    display:flex;flex-direction:column;gap:.4rem;
+  }
+  .card h3{
+    font-family:var(--display);
+    font-size:1.15rem;font-weight:600;margin:0;color:#fff;
+  }
+  .card p{margin:0;color:var(--muted);font-size:.95rem;}
+  .card .tag{
+    font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--teal);
+  }
+
+  pre{
+    font-family:var(--mono);
+    background:var(--surface);
+    border:1px solid var(--edge);
+    border-left:3px solid var(--amber);
+    border-radius:6px;
+    padding:1rem 1.15rem;
+    margin:0;
+    overflow-x:auto;
+    font-size:clamp(.78rem,1vw,.95rem);
+    line-height:1.6;
+    color:var(--ink);
+  }
+  pre .c{color:var(--muted);}
+  pre .k{color:var(--amber);}
+  pre .s{color:var(--teal);}
+  pre .bad{color:var(--rose);}
+
+  /* Split "before / after" comparison */
+  .versus{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;}
+  .versus > div{display:flex;flex-direction:column;gap:.5rem;}
+  .versus h4{
+    margin:0;font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .versus .bad-h{color:var(--rose);}
+  .versus .good-h{color:var(--teal);}
+
+  /* Pipeline: a genuine sequence, so numbering carries meaning */
+  .pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem;}
+  .pipe .step{
+    background:var(--surface);border:1px solid var(--edge);border-radius:8px;
+    padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.35rem;position:relative;
+  }
+  .pipe .n{
+    font-family:var(--mono);font-size:.7rem;color:var(--amber);letter-spacing:.1em;
+  }
+  .pipe .step h3{font-family:var(--display);margin:0;font-size:1.05rem;color:#fff;font-weight:600;}
+  .pipe .step p{margin:0;color:var(--muted);font-size:.9rem;}
+
+  .note{
+    border-left:3px solid var(--teal);
+    padding:.6rem 0 .6rem 1rem;
+    color:var(--muted);
+    max-width:62ch;
+    font-size:1rem;
+  }
+  .note b{color:var(--ink);font-weight:600;}
+
+  table{border-collapse:collapse;width:100%;font-size:clamp(.85rem,1vw,1rem);}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--edge);vertical-align:top;}
+  th{
+    font-family:var(--mono);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--amber);font-weight:400;
+  }
+  td:first-child{color:#fff;font-weight:600;white-space:nowrap;}
+  td{color:var(--muted);}
+  .scroll{overflow-x:auto;}
+
+  /* ---- Chrome ------------------------------------------------------------ */
+  .chrome{
+    position:fixed;left:0;right:0;bottom:0;
+    display:flex;align-items:center;justify-content:space-between;
+    gap:1rem;
+    padding:.7rem var(--pad);
+    background:linear-gradient(to top,var(--ground) 55%,transparent);
+    font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;
+    color:var(--muted);
+    pointer-events:none;
+  }
+  .chrome .brand{text-transform:uppercase;}
+  .chrome .nums{color:var(--ink);font-variant-numeric:tabular-nums;}
+  .chrome button{
+    pointer-events:auto;
+    background:var(--surface);color:var(--ink);
+    border:1px solid var(--edge);border-radius:4px;
+    font-family:var(--mono);font-size:.8rem;
+    width:2rem;height:2rem;cursor:pointer;
+  }
+  .chrome button:hover{border-color:var(--amber);color:var(--amber);}
+  .chrome button:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+  .ctrl{display:flex;gap:.4rem;align-items:center;}
+
+  .bar{position:fixed;top:0;left:0;height:2px;background:var(--amber);transition:width .3s ease;}
+</style>
+
+<div class="bar" id="bar"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Elasticsearch · Logstash · Beats · Kibana</p>
+      <h1>Four boxes<br>and a movie</h1>
+      <p class="lede">The entire Elastic Stack, learned by building one thing: a Netflix-style
+      search app that is both <em>powered by</em> Elasticsearch and <em>watched by</em> it.</p>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">The problem</p>
+      <h2>Why your database gives up on search</h2>
+      <pre><span class="c">-- 6,959 movies. User types "matrix".</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> movies <span class="k">WHERE</span> title <span class="k">LIKE</span> <span class="s">'%matrix%'</span>;</pre>
+      <ul>
+        <li>The leading <code>%</code> kills the index — it's a <b>full table scan</b>, every row, every time</li>
+        <li>Searching <code>overview</code> and <code>cast</code> too? Scan them all as well</li>
+        <li>No ranking. A movie <em>called</em> "The Matrix" ties with one that mentions it once</li>
+        <li>No typo tolerance, no stemming — "matrix" won't find "matrices"</li>
+      </ul>
+      <p class="note">A database answers <b>"which rows match?"</b>. Search has to answer
+      <b>"which rows are most relevant?"</b> — a fundamentally different question.</p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">The idea</p>
+      <h2>Turn the book around</h2>
+      <div class="versus">
+        <div>
+          <h4 class="bad-h">A database — read every page</h4>
+          <pre>doc 1 → "the matrix reloaded"
+doc 2 → "matrix of leadership"
+doc 3 → "the notebook"
+<span class="c">…6,956 more</span></pre>
+        </div>
+        <div>
+          <h4 class="good-h">An inverted index — check the index</h4>
+          <pre><span class="s">"matrix"</span>   → [1, 2]
+<span class="s">"reloaded"</span> → [1]
+<span class="s">"notebook"</span> → [3]</pre>
+        </div>
+      </div>
+      <p class="note">Same trick as the index at the back of a textbook. You don't read the book
+      to find "mitochondria" — you look it up and it tells you the pages.
+      <b>That inversion is Elasticsearch's whole superpower.</b></p>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Component 01</p>
+      <h2>Elasticsearch</h2>
+      <p class="lede">A distributed document store built around the inverted index. JSON in,
+      ranked results out, over HTTP.</p>
+      <div class="cols">
+        <div class="card"><span class="tag">Document</span><h3>One movie</h3><p>A JSON object. No schema migration to add a field.</p></div>
+        <div class="card"><span class="tag">Index</span><h3>All the movies</h3><p>Roughly "a table" — but built for search, not joins.</p></div>
+        <div class="card"><span class="tag">Shard</span><h3>A slice of the index</h3><p>How one index spreads across many machines.</p></div>
+        <div class="card"><span class="tag">Replica</span><h3>A copy of a shard</h3><p>Survives a dead node, and serves reads in parallel.</p></div>
+      </div>
+      <p class="note">Scaling is just <b>more shards on more nodes</b>. That's why the same engine
+      runs a movie catalogue and a petabyte of security logs.</p>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Component 02</p>
+      <h2>Logstash</h2>
+      <p class="lede">The pipeline that gets data <em>in</em> — and fixes it on the way.</p>
+      <div class="pipe">
+        <div class="step"><span class="n">STAGE 1</span><h3>input</h3><p>Where it comes from. Files, Beats, Kafka, JDBC, HTTP.</p></div>
+        <div class="step"><span class="n">STAGE 2</span><h3>filter</h3><p>Parse, convert, enrich, drop. Where the real work happens.</p></div>
+        <div class="step"><span class="n">STAGE 3</span><h3>output</h3><p>Where it lands. Usually Elasticsearch.</p></div>
+      </div>
+      <pre><span class="k">filter</span> {
+  <span class="c"># the app renders a user_score facet.</span>
+  <span class="c"># not one of our 6,959 movies actually has that field.</span>
+  <span class="k">ruby</span> { code =&gt; <span class="s">"event.set('user_score', event.get('vote_average').to_f)"</span> }
+}</pre>
+      <p class="note">That's the argument for Logstash in four lines: <b>the data you have is
+      never quite the data your app needs.</b></p>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Component 03</p>
+      <h2>Beats</h2>
+      <p class="lede">Small single-purpose shippers that sit <em>on</em> the thing being watched.
+      Deliberately dumb: they tail, remember their place, and forward.</p>
+      <div class="cols">
+        <div class="card"><span class="tag">logs</span><h3>Filebeat</h3><p>Tails log files and container stdout.</p></div>
+        <div class="card"><span class="tag">metrics</span><h3>Metricbeat</h3><p>CPU, memory, Docker, Nginx, Postgres…</p></div>
+        <div class="card"><span class="tag">network</span><h3>Packetbeat</h3><p>Reads traffic off the wire.</p></div>
+        <div class="card"><span class="tag">uptime</span><h3>Heartbeat</h3><p>Is it up? Is it answering?</p></div>
+      </div>
+      <p class="note">Why not have Logstash read the files itself? Because Logstash is a JVM that
+      wants a gigabyte. <b>You can't put that on 500 servers. You can put a Beat on 500 servers.</b></p>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Component 04</p>
+      <h2>Kibana</h2>
+      <p class="lede">The window into everything above.</p>
+      <ul>
+        <li><b>Discover</b> — raw documents, filtered and searched. Where you actually debug</li>
+        <li><b>Dev Tools</b> — a console straight to the Elasticsearch API. Live all video</li>
+        <li><b>Dashboards</b> — the charts your manager thinks the whole thing is for</li>
+        <li><b>Maps, Alerts, ML</b> — the parts we're not covering today</li>
+      </ul>
+      <p class="note">Kibana stores nothing. Every panel is <b>a query against Elasticsearch</b>,
+      run when you look at it.</p>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Putting it together</p>
+      <h2>Two paths, one cluster</h2>
+      <pre><span class="c">──  the catalogue  ───────────────────────────────────────</span>
+movies.json  →  <span class="k">LOGSTASH</span>  →  <span class="s">ELASTICSEARCH</span>  →  Elastiflix UI
+                 <span class="c">parse, enrich</span>
+
+<span class="c">──  the observability  ───────────────────────────────────</span>
+app logs     →  <span class="k">FILEBEAT</span>   →  <span class="k">LOGSTASH</span>  →  <span class="s">ELASTICSEARCH</span>  →  <span class="s">KIBANA</span>
+container    →  <span class="k">METRICBEAT</span> ─────────────↗
+metrics          <span class="c">(no transform needed — skip the hop)</span></pre>
+      <p class="note">Note Metricbeat goes <b>straight to Elasticsearch</b>. Logstash is a choice,
+      not a mandatory tax — if there's nothing to transform, don't pay for the hop.</p>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Naming</p>
+      <h2>ELK, Elastic Stack, Elastic Agent</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Name</th><th>What it actually means</th></tr></thead>
+          <tbody>
+            <tr><td>ELK</td><td>The original three: Elasticsearch, Logstash, Kibana. Still what most job descriptions say.</td></tr>
+            <tr><td>ELK-B / Elastic Stack</td><td>Beats joined in 2015 and broke the acronym. Elastic renamed the whole thing "Elastic Stack".</td></tr>
+            <tr><td>Elastic Agent</td><td>One binary replacing the many Beats, managed centrally through Fleet. Where Elastic is heading.</td></tr>
+            <tr><td>EFK</td><td>Same idea, Fluentd instead of Logstash. Common in Kubernetes.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">They're the same family. <b>Learn the four boxes and every variant reads
+      as a swap of one box.</b></p>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Where you'll meet it</p>
+      <h2>Same engine, four industries</h2>
+      <div class="cols">
+        <div class="card"><span class="tag">most common</span><h3>Centralised logging</h3><p>Every service's logs in one searchable place. The gateway use case.</p></div>
+        <div class="card"><span class="tag">security</span><h3>SIEM</h3><p>Threat detection over the same log data. Elastic Security is built on it.</p></div>
+        <div class="card"><span class="tag">sre</span><h3>Observability</h3><p>Logs, metrics and traces together — competing with Datadog and Splunk.</p></div>
+        <div class="card"><span class="tag">product</span><h3>Search</h3><p>What it was actually built for. GitHub, Wikipedia, Uber — and Elastiflix.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">The build</p>
+      <h2>Elastiflix</h2>
+      <p class="lede">Elastic's own movie search demo — forked and extended until all four
+      components are doing real work on it.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Piece</th><th>Job in this build</th></tr></thead>
+          <tbody>
+            <tr><td>Elasticsearch</td><td>Stores and searches 6,959 movies</td></tr>
+            <tr><td>Logstash</td><td>Loads the catalogue, then parses the app's logs</td></tr>
+            <tr><td>Filebeat</td><td>Ships every search a user types</td></tr>
+            <tr><td>Metricbeat</td><td>Ships container CPU and memory</td></tr>
+            <tr><td>Kibana</td><td>One dashboard over all of it</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">The symmetry worth holding onto: <b>Elastiflix is the app using
+      Elasticsearch, and the app monitored by Elasticsearch.</b></p>
+    </div>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide">
+    <div class="wrap">
+      <p class="eyebrow">Enough theory</p>
+      <h1>Let's build it</h1>
+      <pre>git clone github.com/LondheShubham153/Elastiflix
+./start.sh</pre>
+      <p class="lede">github.com/LondheShubham153/Elastiflix — branch <code>elk-one-shot</code></p>
+    </div>
+  </section>
+
+</div>
+
+<div class="chrome">
+  <span class="brand">Elastic Stack · One Shot</span>
+  <span class="ctrl">
+    <button id="prev" aria-label="Previous slide">←</button>
+    <span class="nums"><span id="cur">1</span> / <span id="tot">12</span></span>
+    <button id="next" aria-label="Next slide">→</button>
+  </span>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const cur = document.getElementById('cur');
+  const bar = document.getElementById('bar');
+  let i = 0;
+
+  document.getElementById('tot').textContent = slides.length;
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => k === i ? s.setAttribute('data-active','') : s.removeAttribute('data-active'));
+    cur.textContent = i + 1;
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+
+  document.getElementById('next').onclick = () => show(i + 1);
+  document.getElementById('prev').onclick = () => show(i - 1);
+
+  addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key))          { e.preventDefault(); show(i - 1); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End')  show(slides.length - 1);
+  });
+
+  show(parseInt(location.hash.slice(1), 10) - 1 || 0);
+</script>

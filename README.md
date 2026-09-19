@@ -27,8 +27,8 @@ Simply run this script and provide the an Elasticsearch endpoint and an API key:
 
 ```bash
 python3 index-data.py \
-    --es_host https://elastiflix-project.es.us-west2.gcp.elastic-cloud.com \
-    --es_api_key YkxxQ1lKY0IwenE1MzBaSnEtQkM6QU9EMnloM2NENFJKZVN3QUpzVDZfww== \
+    --es_host https://your-project.es.us-west2.gcp.elastic-cloud.com \
+    --es_api_key YOUR_API_KEY \
     --index_name elastiflix-movies \
     --recreate \
     --create_inference_endpoints
