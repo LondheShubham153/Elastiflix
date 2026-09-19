@@ -145,6 +145,32 @@ running both means two networks plus wiring its generated API key into three con
 The single root `docker-compose.yml` starts all seven together instead. See `LEARN.md` §11
 for what `start-local` does, when to prefer it, and how to try it.
 
+## Running on an AWS EC2 instance
+
+Works the same way, with a few things to get right first:
+
+- **Instance size**: `t3.large` (8 GB) minimum, `t3.xlarge` (16 GB) comfortable — same
+  memory bar as running this on a laptop.
+- **Storage**: 30 GB+ EBS volume (container images + Elasticsearch data + logs add up).
+- **Security group**: open inbound ports `3000` (Elastiflix), `5601` (Kibana), `9200`
+  (Elasticsearch) and `17700` (backend) to your IP.
+- **Docker**: install it if the AMI doesn't have it — `curl -fsSL https://get.docker.com | sudo sh`.
+- **`vm.max_map_count`**: Elasticsearch needs this raised on native Linux (Docker Desktop
+  on Mac/Windows sets it for you inside its own VM, so this is easy to miss):
+  ```bash
+  sudo sysctl -w vm.max_map_count=262144
+  ```
+- **`PUBLIC_HOST`**: the frontend's `REACT_APP_ES_API` URL is baked into the JS bundle
+  at build time, so it must point at a host your browser can actually reach — not
+  `localhost`, which on EC2 means your own laptop. Set it to the instance's public
+  IP/DNS before starting:
+  ```bash
+  export PUBLIC_HOST=<ec2-public-ip-or-dns>
+  ./start.sh
+  ```
+
+Then open `http://<PUBLIC_HOST>:3000` and `http://<PUBLIC_HOST>:5601` from your browser.
+
 ## A note on security
 
 `xpack.security.enabled=false` in `docker-compose.yml`. That is deliberate: this is a
