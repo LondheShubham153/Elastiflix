@@ -169,8 +169,10 @@ services:
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
-      # The browser talks to the backend, so this is a localhost URL.
-      - REACT_APP_ES_API=http://localhost:17700/api
+      # The browser talks to the backend directly, so this must be a host it
+      # can reach — localhost by default, or the EC2 public IP/DNS via
+      # PUBLIC_HOST (see aws/ec2-setup.sh).
+      - REACT_APP_ES_API=http://${PUBLIC_HOST:-localhost}:17700/api
     ports:
       - "3000:3000"
     volumes:
