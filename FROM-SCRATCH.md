@@ -106,12 +106,20 @@ sudo apt update
 sudo apt install -y elasticsearch
 ```
 
-The install prints an `elastic` superuser password once, to the terminal. Copy
-it somewhere. If you miss it, reset it later with:
+The install prints an `elastic` superuser password once, to the terminal —
+but only if the package's postinstall script actually starts and
+auto-configures Elasticsearch on the spot. On some systemd setups (verified
+on Ubuntu 26.04 via a systemd-nspawn-less apt install) the package installs
+with **"NOT starting on installation"** and no password is printed at all.
+Start the service first, then reset the password explicitly:
 
 ```bash
-sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic
+sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b -s
 ```
+
+(`-b -s` runs it non-interactively and prints just the password — do this
+after `systemctl enable --now elasticsearch` below if the install didn't
+print one, or any time you miss it.)
 
 On a small box, pin the heap so Elasticsearch doesn't grab half your RAM:
 
@@ -125,14 +133,18 @@ Start it and check it's alive:
 sudo systemctl enable --now elasticsearch
 
 export ELASTIC_PASSWORD='paste-the-password-here'
-curl --cacert /etc/elasticsearch/certs/http_ca.crt \
+sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
   -u elastic:$ELASTIC_PASSWORD https://localhost:9200
 ```
 
 You should get back a JSON blob with a cluster name and version. That `--cacert`
 flag matters: security is on, so Elasticsearch is serving HTTPS with a
 self-signed certificate, and every request from here on needs it plus
-`-u elastic:$ELASTIC_PASSWORD`.
+`-u elastic:$ELASTIC_PASSWORD`. Note the `sudo` on the `curl` itself, not just
+on installing things: `/etc/elasticsearch/certs/http_ca.crt` is `root:elasticsearch`,
+mode `640`, so a plain user account can't open it — every `curl --cacert
+.../http_ca.crt` command in this guide needs `sudo` in front of it, not just
+`export ELASTIC_PASSWORD`.
 
 ## 2. Kibana
 
@@ -148,19 +160,29 @@ sudo /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kiban
 sudo /usr/share/kibana/bin/kibana-setup --enrollment-token <paste-token-here>
 ```
 
-Start it, then open `https://localhost:5601` in a browser:
+The apt package's Kibana only binds to `127.0.0.1` by default
+(`server.host` in `/etc/kibana/kibana.yml`) — fine on the same machine, but
+unreachable from your browser if Kibana is on a remote box like an EC2
+instance. If you're not opening it from `localhost`, add before starting:
+
+```bash
+echo 'server.host: "0.0.0.0"' | sudo tee -a /etc/kibana/kibana.yml
+```
+
+Start it, then open `http://<host>:5601` in a browser (`https://localhost:5601`
+if you're on the box itself and didn't change `server.host`):
 
 ```bash
 sudo systemctl enable --now kibana
 ```
 
-The first load asks for a verification code. Get one with:
-
-```bash
-sudo /usr/share/kibana/bin/kibana-verification-code
-```
-
-Log in as `elastic` with the password from step 1.
+You should land straight on a login page. The "first load asks for a
+verification code" flow only applies to a Kibana that's never been paired
+with a cluster and configures itself interactively through the browser —
+since you already ran `kibana-setup --enrollment-token` above, that pairing
+is done, and `kibana-verification-code` will just say "Couldn't find
+verification code... you can safely ignore this message." Log in as
+`elastic` with the password from step 1.
 
 ## 3. The movie catalogue
 
@@ -198,7 +220,7 @@ mapping without reindexing. Install the mapping this repo already ships,
 `elk/logstash/templates/movies-template.json`, as an index template:
 
 ```bash
-curl --cacert /etc/elasticsearch/certs/http_ca.crt \
+sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
   -u elastic:$ELASTIC_PASSWORD \
   -X PUT "https://localhost:9200/_index_template/elastiflix-movies" \
   -H 'Content-Type: application/json' \
@@ -217,11 +239,21 @@ sudo apt install -y logstash
 ```
 
 Logstash needs credentials to write to a secured cluster. Store the password in
-its keystore rather than a plaintext file:
+its keystore rather than a plaintext file. A fresh apt install has no keystore
+yet, so create one first — it'll warn about running without a keystore
+password, which is fine for a learning box:
 
 ```bash
+echo "y" | sudo /usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash create
 echo "$ELASTIC_PASSWORD" | sudo /usr/share/logstash/bin/logstash-keystore --path.settings /etc/logstash add ELASTIC_PASSWORD
 ```
+
+Logstash 9.5.4's `logstash-keystore add` **lowercases whatever key name you
+give it** — `add ELASTIC_PASSWORD` actually stores it as `elastic_password`
+(confirmed with `logstash-keystore list`, and reproduced with an unrelated
+test key). The pipeline output blocks below reference it as
+`${elastic_password}`, lowercase, to match what's actually in the keystore —
+not `${ELASTIC_PASSWORD}`.
 
 Copy this repo's index templates and pipeline files into place:
 
@@ -232,7 +264,20 @@ sudo cp elk/logstash/pipeline/*.conf /etc/logstash/pipeline/
 sudo cp elk/logstash/config/logstash.yml /etc/logstash/logstash.yml
 ```
 
-Two things need to change from the Docker versions, because the host and
+That last copy overwrites the apt package's own `logstash.yml`, which
+normally sets `path.data: /var/lib/logstash` (owned by the `logstash`
+service user). The Docker version of this file doesn't set `path.data` at
+all — Docker doesn't need it, the container has its own filesystem — so
+after this copy Logstash falls back to `LS_HOME/data`
+(`/usr/share/logstash/data`), which is `root`-owned and not writable by the
+`logstash` user. It fails to start with `Path "/usr/share/logstash/data"
+must be a writable directory`. Add the setting back:
+
+```bash
+echo "path.data: /var/lib/logstash" | sudo tee -a /etc/logstash/logstash.yml
+```
+
+Two more things need to change from the Docker versions, because the host and
 security are different here. In both `/etc/logstash/pipeline/movies.conf` and
 `/etc/logstash/pipeline/logs.conf`, the `output { elasticsearch { ... } }`
 block needs HTTPS and credentials instead of `${ES_HOST}`:
@@ -242,13 +287,28 @@ output {
   elasticsearch {
     hosts       => [ "https://localhost:9200" ]
     ssl_enabled => true
-    cacert      => "/etc/elasticsearch/certs/http_ca.crt"
+    ssl_certificate_authorities => [ "/etc/elasticsearch/certs/http_ca.crt" ]
     user        => "elastic"
-    password    => "${ELASTIC_PASSWORD}"
+    password    => "${elastic_password}"   # lowercase — see the keystore note above
     ...
     template    => "/etc/logstash/templates/movies-template.json"   # was /usr/share/logstash/...
   }
 }
+```
+
+That's `ssl_certificate_authorities`, not `cacert`: this repo's Docker
+pipelines never needed a CA option at all (security is off), but the version
+of the `logstash-output-elasticsearch` plugin bundled with 9.5.4 has also
+dropped the older `cacert` setting entirely — using it is a hard
+`ConfigurationError` at pipeline startup, not a deprecation warning.
+
+One more permission to fix before starting Logstash: the `logstash` service
+user isn't in the `elasticsearch` group, so it can't read
+`/etc/elasticsearch/certs/http_ca.crt` (root:elasticsearch, mode 640) either,
+and the pipeline will fail to connect. Fix it once:
+
+```bash
+sudo usermod -aG elasticsearch logstash
 ```
 
 And in `movies.conf`, point the file input at the ndjson you generated in step 3:
@@ -289,7 +349,7 @@ sudo systemctl enable --now logstash
 Give it a minute, then check the movies landed:
 
 ```bash
-curl --cacert /etc/elasticsearch/certs/http_ca.crt \
+sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
   -u elastic:$ELASTIC_PASSWORD https://localhost:9200/elastiflix-movies/_count
 ```
 
@@ -298,27 +358,66 @@ exactly which stage is failing.
 
 ## 5. Run the app, so there's something to search
 
+If you skipped Node for the earlier steps, install it now (Ubuntu 24.04/26.04
+ship Node 18+ directly in the default repo, no NodeSource setup needed):
+
+```bash
+sudo apt install -y nodejs npm
+```
+
 The Elastiflix backend already logs one JSON object per request to stdout
-(`backend/src/logger.js`), which is exactly what a log pipeline wants. Run it
-natively and capture that output to a file:
+(`backend/src/logger.js`), which is exactly what a log pipeline wants.
+`backend/src/*Connector.js` only takes `host` + `apiKey` — there's no
+username/password option — so create a scoped API key rather than reusing
+the `elastic` superuser password:
+
+```bash
+sudo curl -s --cacert /etc/elasticsearch/certs/http_ca.crt \
+  -u elastic:$ELASTIC_PASSWORD \
+  -X POST "https://localhost:9200/_security/api_key" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"elastiflix-backend"}'
+```
+
+That returns `id`, `api_key`, and `encoded`. Use `encoded` — the connector
+sends whatever you give it verbatim as `Authorization: ApiKey <value>`, and
+Elasticsearch expects that to be base64(`id:api_key`), not the plaintext
+`api_key:id` pair. Getting this wrong doesn't 401 cleanly: the connector
+crashes with `Cannot read properties of undefined (reading 'total')`,
+because it reads `response.hits.total` without checking for an error body
+first.
+
+The other half is TLS: the connector does a plain `fetch()` against
+`https://localhost:9200` with no CA option, so it rejects Elasticsearch's
+self-signed certificate outright (`fetch failed`) unless Node is told to
+trust it:
 
 ```bash
 cd backend
 npm install
-ES_HOST=https://localhost:9200 ES_API_KEY= LOCAL=true \
+NODE_EXTRA_CA_CERTS=/etc/elasticsearch/certs/http_ca.crt \
+  ES_HOST=https://localhost:9200 ES_API_KEY='<the encoded value>' \
+  ES_INDEX=elastiflix-movies LOCAL=true \
   npm start > /tmp/elastiflix-data/backend.log 2>&1 &
 ```
 
-You'll need to point the backend's Elasticsearch client at your secured
-cluster with the `elastic` credentials; check `backend/src/` for where the
-client is constructed if you're adapting this for a non-demo cluster. For the
-frontend:
+(`sudo`-owned certs are unreadable to a plain `npm start`; either
+`sudo chmod +r` the file or copy it somewhere your user owns, e.g.
+`/tmp/elastiflix-data/http_ca.crt`, and point `NODE_EXTRA_CA_CERTS` there instead.)
+
+For the frontend:
 
 ```bash
 cd ../frontend
-npm install
+npm install --force
 REACT_APP_ES_API=http://localhost:17700/api npm start
 ```
+
+`--force` isn't optional here — `react-scripts@5.0.1`'s peer dependency on
+`typescript@^3.2.1 || ^4` conflicts with what's actually in `package.json`,
+and a plain `npm install` refuses outright with `ERESOLVE`. The Docker image
+hits the same wall, which is why `frontend/Dockerfile` already runs
+`npm install --force`.
 
 Open `http://localhost:3000` and search for a few movies. Each search writes a
 line to `backend.log`.
@@ -352,7 +451,7 @@ sudo systemctl enable --now filebeat
 Search a few more movies in the browser, then check the logs arrived:
 
 ```bash
-curl --cacert /etc/elasticsearch/certs/http_ca.crt \
+sudo curl --cacert /etc/elasticsearch/certs/http_ca.crt \
   -u elastic:$ELASTIC_PASSWORD "https://localhost:9200/elastiflix-logs-*/_count"
 ```
 
@@ -365,7 +464,21 @@ sudo apt install -y metricbeat
 There's no Docker to watch on a bare box, so use the `system` module instead
 of the repo's `docker` module. It's the same idea: a Beat sitting on the thing
 being monitored, shipping CPU, memory and disk straight to Elasticsearch since
-there's no transform needed. Write `/etc/metricbeat/metricbeat.yml`:
+there's no transform needed.
+
+A plain `export ELASTIC_PASSWORD=...` won't reach Metricbeat's `${VAR}`
+substitution — that only resolves from the *Beat's own* process
+environment, and neither a plain `sudo metricbeat ...` nor the systemd
+service inherit your shell's exports. Use Metricbeat's keystore instead,
+the same idea as Logstash's in step 4 but — unlike Logstash's — it
+preserves the case of the key you give it:
+
+```bash
+echo "y" | sudo metricbeat keystore create
+echo "$ELASTIC_PASSWORD" | sudo metricbeat keystore add ELASTIC_PASSWORD --stdin
+```
+
+Write `/etc/metricbeat/metricbeat.yml`:
 
 ```yaml
 metricbeat.modules:
@@ -388,12 +501,21 @@ output.elasticsearch:
   password: "${ELASTIC_PASSWORD}"
 
 setup.kibana:
-  host: "https://localhost:5601"
-  ssl.certificate_authorities: ["/etc/elasticsearch/certs/http_ca.crt"]
-username: "elastic"
-password: "${ELASTIC_PASSWORD}"
+  host: "http://localhost:5601"
+
 setup.dashboards.enabled: true
 ```
+
+Two things differ from what you'd guess by analogy with Elasticsearch:
+`setup.kibana.host` is **`http`**, not `https` — the apt Kibana package
+doesn't enable its own TLS by default even with a secured Elasticsearch
+behind it (see the note in step 2), so there's no `ssl.certificate_authorities`
+to give it either. And this config has a single `output.elasticsearch` block
+with `username`/`password` properly nested under it — a stray pair of
+top-level `username:`/`password:` lines outside any block (easy to
+type by accident when copy-pasting the Elasticsearch block's shape) are not
+valid Metricbeat settings and get silently ignored, not merged into the
+output.
 
 (Using the `elastic` superuser here is a shortcut for a learning box. A real
 deployment would use the built-in `kibana_system` account or a scoped API key
