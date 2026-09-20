@@ -10,7 +10,7 @@ const app = express();
 if (process.env.LOCAL) {
   app.use(
     cors({
-      origin: "http://localhost:3000",
+      origin: `http://${process.env.PUBLIC_HOST || "localhost"}:3000`,
       credentials: true
     })
   );

@@ -152,6 +152,10 @@ services:
     environment:
       - LOCAL=true
       - NODE_ENV=development
+      # Must match the frontend's PUBLIC_HOST so CORS allows the browser's
+      # origin — localhost by default, or the EC2 public IP/DNS via
+      # PUBLIC_HOST (see aws/ec2-setup.sh).
+      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
       # `elasticsearch` is the service name above — Docker resolves it for us.
       - ES_HOST=http://elasticsearch:9200
       - ES_INDEX=elastiflix-movies
