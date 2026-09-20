@@ -154,7 +154,7 @@ services:
       - NODE_ENV=development
       # Must match the frontend's PUBLIC_HOST so CORS allows the browser's
       # origin — localhost by default, or the EC2 public IP/DNS via
-      # PUBLIC_HOST (see aws/ec2-setup.sh).
+      # PUBLIC_HOST (see "Running on an AWS EC2 instance" in README-ELK.md).
       - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
       # `elasticsearch` is the service name above — Docker resolves it for us.
       - ES_HOST=http://elasticsearch:9200
@@ -175,7 +175,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
       # The browser talks to the backend directly, so this must be a host it
       # can reach — localhost by default, or the EC2 public IP/DNS via
-      # PUBLIC_HOST (see aws/ec2-setup.sh).
+      # PUBLIC_HOST (see "Running on an AWS EC2 instance" in README-ELK.md).
       - REACT_APP_ES_API=http://${PUBLIC_HOST:-localhost}:17700/api
     ports:
       - "3000:3000"
