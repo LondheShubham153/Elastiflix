@@ -10,6 +10,7 @@
     "@emotion/react": "^11.14.0",
     "caniuse-lite": "^1.0.30001812",
     "humanize-string": "^3.0.0",
+    "moment": "^2.31.0",
     "prop-types": "^15.7.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
