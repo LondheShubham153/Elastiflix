@@ -6,6 +6,8 @@
     "@elastic/eui": "98.2.1",
     "@elastic/react-search-ui": "1.24.1",
     "@elastic/search-ui-elasticsearch-connector": "1.24.1",
+    "@emotion/css": "^11.13.5",
+    "@emotion/react": "^11.14.0",
     "caniuse-lite": "^1.0.30001812",
     "humanize-string": "^3.0.0",
     "prop-types": "^15.7.2",
