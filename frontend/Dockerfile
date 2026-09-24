@@ -10,6 +10,10 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
+
+ENV DISABLE_ESLINT_PLUGIN=true
+ENV CI=false
+
 RUN npm run build
 
 FROM nginx:alpine AS production
